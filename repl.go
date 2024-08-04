@@ -5,31 +5,32 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/Ch40s1/pokedex-go/internal/pokeapi"
 )
 
-func startRepl() {
-	// create a new scanner
+type config struct {
+	pokeapiClient    pokeapi.Client
+	nextLocationsURL *string
+	prevLocationsURL *string
+}
+
+func startRepl(cfg *config) {
 	reader := bufio.NewScanner(os.Stdin)
-	// infinite for loop
 	for {
-		// this is the prompt
 		fmt.Print("Pokedex > ")
-		// scan the input
 		reader.Scan()
 
-		// clean the input
 		words := cleanInput(reader.Text())
 		if len(words) == 0 {
 			continue
 		}
 
-		// get the command name
 		commandName := words[0]
 
-		// check if the command exists in the map
 		command, exists := getCommands()[commandName]
 		if exists {
-			err := command.callback()
+			err := command.callback(cfg)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -41,7 +42,6 @@ func startRepl() {
 	}
 }
 
-// this function will clean the input from the user and return a slice of words
 func cleanInput(text string) []string {
 	output := strings.ToLower(text)
 	words := strings.Fields(output)
@@ -51,7 +51,7 @@ func cleanInput(text string) []string {
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func(*config) error
 }
 
 func getCommands() map[string]cliCommand {
@@ -61,20 +61,20 @@ func getCommands() map[string]cliCommand {
 			description: "Displays a help message",
 			callback:    commandHelp,
 		},
+		"map": {
+			name:        "map",
+			description: "Get the next page of locations",
+			callback:    commandMapf,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "Get the previous page of locations",
+			callback:    commandMapb,
+		},
 		"exit": {
 			name:        "exit",
 			description: "Exit the Pokedex",
 			callback:    commandExit,
-		},
-		"map": {
-			name:        "map",
-			description: "Show locations",
-			callback:    getMapNext,
-		},
-		"mapb": {
-			name:        "mapb",
-			description: "Show previous locations",
-			callback:    getMapPrevious,
 		},
 	}
 }

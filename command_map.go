@@ -1,80 +1,40 @@
 package main
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
-	"net/http"
-	"sync"
 )
 
-type Location struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
-type PokeApiResponse struct {
-	Count    int        `json:"count"`
-	Next     string     `json:"next"`
-	Previous string     `json:"previous"`
-	Results  []Location `json:"results"`
-}
-
-var offset int
-var limit = 20
-var mu sync.Mutex
-
-func getPokeApi(offset int) ([]Location, error) {
-	url := fmt.Sprintf("https://pokeapi.co/api/v2/location/?offset=%d&limit=%d", offset, limit)
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("error getting request from API: %v", err)
-	}
-	defer resp.Body.Close()
-
-	fmt.Println("Response status:", resp.Status)
-
-	var result PokeApiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error decoding JSON response: %v", err)
-	}
-
-	return result.Results, nil
-}
-
-func getMapNext() error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	locations, err := getPokeApi(offset)
+func commandMapf(cfg *config) error {
+	locationsResp, err := cfg.pokeapiClient.ListLocations(cfg.nextLocationsURL)
 	if err != nil {
 		return err
 	}
 
-	for _, location := range locations {
-		fmt.Println(location.Name)
-	}
+	cfg.nextLocationsURL = locationsResp.Next
+	cfg.prevLocationsURL = locationsResp.Previous
 
-	offset += limit
+	for _, loc := range locationsResp.Results {
+		fmt.Println(loc.Name)
+	}
 	return nil
 }
 
-func getMapPrevious() error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if offset == 0 {
-		return fmt.Errorf("cannot call mapb: In first page")
+func commandMapb(cfg *config) error {
+	if cfg.prevLocationsURL == nil {
+		return errors.New("you're on the first page")
 	}
 
-	offset -= limit
-	locations, err := getPokeApi(offset)
+	locationResp, err := cfg.pokeapiClient.ListLocations(cfg.prevLocationsURL)
 	if err != nil {
 		return err
 	}
 
-	for _, location := range locations {
-		fmt.Println(location.Name)
-	}
+	cfg.nextLocationsURL = locationResp.Next
+	cfg.prevLocationsURL = locationResp.Previous
 
+	for _, loc := range locationResp.Results {
+		fmt.Println(loc.Name)
+	}
 	return nil
 }
