@@ -3,11 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"sync"
 )
 
-// Define a struct to match the structure of the JSON response
 type Location struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
@@ -20,24 +19,62 @@ type PokeApiResponse struct {
 	Results  []Location `json:"results"`
 }
 
-func getPokeApi() error {
-	resp, err := http.Get("https://pokeapi.co/api/v2/location/")
+var offset int
+var limit = 20
+var mu sync.Mutex
+
+func getPokeApi(offset int) ([]Location, error) {
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/location/?offset=%d&limit=%d", offset, limit)
+	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatalf("Error getting request from API: %v", err)
+		return nil, fmt.Errorf("error getting request from API: %v", err)
 	}
 	defer resp.Body.Close()
 
 	fmt.Println("Response status:", resp.Status)
 
-	// Decode the JSON response into the PokeApiResponse struct
 	var result PokeApiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Fatalf("Error decoding JSON response: %v", err)
+		return nil, fmt.Errorf("error decoding JSON response: %v", err)
 	}
 
-	// Print just the names of the locations
-	for _, location := range result.Results {
+	return result.Results, nil
+}
+
+func getMapNext() error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	locations, err := getPokeApi(offset)
+	if err != nil {
+		return err
+	}
+
+	for _, location := range locations {
 		fmt.Println(location.Name)
 	}
+
+	offset += limit
+	return nil
+}
+
+func getMapPrevious() error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if offset == 0 {
+		return fmt.Errorf("cannot call mapb: In first page")
+	}
+
+	offset -= limit
+	locations, err := getPokeApi(offset)
+	if err != nil {
+		return err
+	}
+
+	for _, location := range locations {
+		fmt.Println(location.Name)
+	}
+
 	return nil
 }

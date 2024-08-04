@@ -69,7 +69,12 @@ func getCommands() map[string]cliCommand {
 		"map": {
 			name:        "map",
 			description: "Show locations",
-			callback:    getPokeApi,
+			callback:    getMapNext,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "Show previous locations",
+			callback:    getMapPrevious,
 		},
 	}
 }
